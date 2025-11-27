@@ -35,8 +35,8 @@ import androidx.camera.view.PreviewView
 // 📌 4. Compose – Animations
 // ------------------------------------------
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.foundation.layout.offset
 import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
@@ -51,17 +51,20 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.Row
 
 
 // ------------------------------------------
@@ -74,10 +77,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.animation.core.Animatable
+
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.platform.LocalContext
@@ -86,9 +93,6 @@ import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 
 
@@ -101,19 +105,214 @@ import java.util.concurrent.Executors
 import kotlin.math.PI
 import kotlin.math.sin
 import kotlin.math.sqrt
-import kotlin.random.Random
 import kotlinx.coroutines.delay
-
 
 
 val LseFontFamily = FontFamily(
     Font(R.font.good_times_rg, weight = FontWeight.Normal)
 )
-val LseFontFamily2 = FontFamily(
-    Font(R.font.type_machine, weight = FontWeight.Normal)
+
+// 🔹 Modelo de flashcards + datos
+data class CardInfo(
+    val title: String,
+    val shortBody: String,
+    val accent: Color,
+    val background: List<Color>,
+    val paragraphs: List<String>
+)
+
+val infoCards = listOf(
+    CardInfo(
+        title = "Lengua de Signos Española",
+        shortBody = "La LSE es una lengua viva con historia e identidad propias.",
+        accent = Color(0xFFFB8CFF),
+        background = listOf(Color(0xFFFFE6FF), Color(0xFFF3D9FF)),
+        paragraphs = listOf(
+            "La Lengua de Signos Española (LSE) es una lengua completa, con gramática y estructura propias. No se limita a traducir palabra por palabra el castellano, sino que organiza la información de una manera visual y espacial.",
+            "Cada seña, cada expresión facial y cada movimiento del cuerpo aportan matices de significado. Por eso, la LSE no es un “apoyo” al habla, sino una forma legítima y plena de comunicación.",
+            "Conocer y respetar la LSE significa reconocer la cultura, la identidad y la historia de la comunidad sorda que la utiliza cada día."
+        )
+    ),
+    CardInfo(
+        title = "Inclusión real",
+        shortBody = "La accesibilidad comunicativa es un derecho, no un extra.",
+        accent = Color(0xFF80DEEA),
+        background = listOf(Color(0xFFE0FBFF), Color(0xFFCCF7FF)),
+        paragraphs = listOf(
+            "Cuando hablamos de inclusión real, no basta con que una persona “pueda estar” en un lugar. Es importante que también pueda participar, opinar y entender todo lo que ocurre a su alrededor.",
+            "La accesibilidad comunicativa incluye intérpretes de LSE, subtítulos, materiales visuales y herramientas tecnológicas que reducen las barreras entre personas oyentes y sordas.",
+            "Diseñar espacios accesibles no solo beneficia a la comunidad sorda: mejora la comunicación para todos y hace que los entornos sean más claros, respetuosos y humanos."
+        )
+    ),
+    CardInfo(
+        title = "Tecnología que acompaña",
+        shortBody = "La tecnología puede ayudar a acercar mundos distintos.",
+        accent = Color(0xFFFFF59D),
+        background = listOf(Color(0xFFFFFDE7), Color(0xFFFFF9C4)),
+        paragraphs = listOf(
+            "La tecnología, bien usada, puede convertirse en una aliada de la accesibilidad. No sustituye a las personas ni a la Lengua de Signos, pero puede ayudar a visibilizar, enseñar y apoyar procesos de aprendizaje.",
+            "Proyectos como MAS-CA GESTURES muestran que es posible combinar modelos de reconocimiento, diseño de interfaz y sensibilidad social para acercar la LSE a más gente.",
+            "El reto está en que la tecnología no hable por la comunidad sorda, sino que camine a su lado, respetando sus tiempos, su cultura y sus necesidades reales."
+        )
+    ),
+    CardInfo(
+        title = "Aprender a señar",
+        shortBody = "Aprender LSE es un gesto de empatía y respeto.",
+        accent = Color(0xFFB39DDB),
+        background = listOf(Color(0xFFF2E7FE), Color(0xFFE9D7FF)),
+        paragraphs = listOf(
+            "Acercarse a la Lengua de Signos es abrir la puerta a una forma distinta de percibir y compartir el mundo. No se trata solo de memorizar señas, sino de aprender a mirar, a esperar y a comunicar con todo el cuerpo.",
+            "Cada persona oyente que aprende LSE está tendiendo un puente hacia la comunidad sorda: facilita la convivencia en clase, en el trabajo y en la vida diaria.",
+            "Aunque al principio cueste, cada seña aprendida es un pequeño paso hacia una sociedad donde comunicarse no dependa únicamente del oído, sino también de las manos, la mirada y la empatía."
+        )
+    )
 )
 
 
+// 🔹 Flashcards amigables, gorditas y pastel (versión compacta, clicable)
+@Composable
+fun InfoFlashcards(
+    modifier: Modifier = Modifier,
+    onCardClick: (Int) -> Unit
+) {
+    var currentIndex by remember { mutableStateOf(0) }
+
+    // -1 = izquierda, 0 = centro, 1 = derecha
+    val slideX = remember { Animatable(-1f) }
+
+    // Pulso suave
+    val pulseTransition = rememberInfiniteTransition(label = "card_pulse")
+    val pulseScale by pulseTransition.animateFloat(
+        initialValue = 0.97f,
+        targetValue = 1.05f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1100, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "card_pulse_scale"
+    )
+
+    // Carrusel con animación
+    LaunchedEffect(Unit) {
+        var idx = 0
+        while (true) {
+            currentIndex = idx
+
+            slideX.snapTo(-1f)
+
+            slideX.animateTo(
+                targetValue = 0f,
+                animationSpec = tween(
+                    durationMillis = 550,
+                    easing = FastOutSlowInEasing
+                )
+            )
+
+            delay(4000L)
+
+            slideX.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(
+                    durationMillis = 550,
+                    easing = FastOutSlowInEasing
+                )
+            )
+
+            delay(150L)
+            idx = (idx + 1) % infoCards.size
+        }
+    }
+
+    val card = infoCards[currentIndex]
+
+    // Transparencia suave
+    val centerFactor = (1f - kotlin.math.abs(slideX.value)).coerceIn(0f, 1f)
+    val cardAlpha = 0.45f + 0.55f * centerFactor
+
+    Box(modifier = modifier) {
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .offset(x = (slideX.value * 420f).dp)
+                .padding(horizontal = 24.dp)
+        ) {
+
+            // Flashcard compacta
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer {
+                        scaleX = pulseScale
+                        scaleY = pulseScale
+                        alpha = cardAlpha
+                    }
+                    .shadow(
+                        elevation = 14.dp,
+                        shape = RoundedCornerShape(22.dp)
+                    )
+                    .background(
+                        brush = Brush.linearGradient(card.background),
+                        shape = RoundedCornerShape(22.dp)
+                    )
+                    .clickable { onCardClick(currentIndex) }
+                    .padding(horizontal = 16.dp, vertical = 10.dp)
+            ) {
+                Column {
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+
+                        Box(
+                            modifier = Modifier
+                                .height(24.dp)
+                                .width(4.dp)
+                                .background(
+                                    brush = Brush.verticalGradient(
+                                        listOf(
+                                            card.accent,
+                                            card.accent.copy(alpha = 0.6f)
+                                        )
+                                    ),
+                                    shape = RoundedCornerShape(50)
+                                )
+                        )
+
+                        Spacer(modifier = Modifier.width(10.dp))
+
+                        Column {
+                            Text(
+                                text = card.title,
+                                fontSize = 14.sp,
+                                fontFamily = LseFontFamily,
+                                color = Color(0xFF2B2840)
+                            )
+
+                            Box(
+                                modifier = Modifier
+                                    .padding(top = 2.dp)
+                                    .width(40.dp)
+                                    .height(2.dp)
+                                    .background(
+                                        color = card.accent.copy(alpha = 0.6f),
+                                        shape = RoundedCornerShape(50)
+                                    )
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = card.shortBody,
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp,
+                        color = Color(0xFF3B3555)
+                    )
+                }
+            }
+        }
+    }
+}
 
 // Pantallas simples: menú inicial / cámara
 enum class Screen {
@@ -270,7 +469,8 @@ class MainActivity : ComponentActivity() {
                     cameraExecutor = cameraExecutor,
                     handLandmarkerHelper = handLandmarkerHelper,
                     gestureLabel = gestureLabel,
-                    gestureConfidence = gestureConfidence
+                    gestureConfidence = gestureConfidence,
+                    onBack = { currentScreen = Screen.HOME }
                 )
             }
         }
@@ -324,6 +524,7 @@ fun HomeScreen(
     onStartClick: () -> Unit
 ) {
     var showCredits by remember { mutableStateOf(false) }
+    var expandedCardIndex by remember { mutableStateOf<Int?>(null) }
 
     // 🔹 Fade-in del bloque central
     var startAnimation by remember { mutableStateOf(false) }
@@ -372,10 +573,17 @@ fun HomeScreen(
                 modifier = Modifier.fillMaxSize()
             )
 
-            // ✨ Palabras flotando y escribiéndose SOLO por la zona superior
-            FloatingTypewriterWordsAboveTitle(
-                modifier = Modifier.fillMaxSize()
-            )
+// 🔹 Flashcards más abajo y más gorditas
+            if (expandedCardIndex == null) {
+                InfoFlashcards(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 90.dp),
+                    onCardClick = { index ->
+                        expandedCardIndex = index
+                    }
+                )
+            }
 
             // Contenido principal centrado con fade-in
             Column(
@@ -395,20 +603,20 @@ fun HomeScreen(
 
                 Spacer(modifier = Modifier.height(6.dp))
 
-                // Subtítulo tipo social
+                // Subtítulo tipo social (mejor contraste)
                 Text(
                     text = "Reconocimiento de gestos en Lengua de Signos",
-                    fontSize = 15.sp,
-                    color = Color(0xFFB3B3FF)
+                    fontSize = 16.sp,
+                    color = Color(0xFFCED4FF)
                 )
 
                 Spacer(modifier = Modifier.height(32.dp))
 
-                // Botón circular morado con efecto "pulso"
+                // Botón circular morado con glow suave + pulse
                 Box(
                     modifier = Modifier
-                        .size(150.dp)
-                        .scale(scale)   // 👈 pulso
+                        .size(160.dp)
+                        .scale(scale)
                         .background(
                             brush = Brush.radialGradient(
                                 colors = listOf(
@@ -418,27 +626,34 @@ fun HomeScreen(
                             ),
                             shape = CircleShape
                         )
+                        .shadow(
+                            elevation = 22.dp,
+                            shape = CircleShape,
+                            ambientColor = Color(0x884A2AFF),
+                            spotColor = Color(0x884A2AFF)
+                        )
                         .clickable { onStartClick() },
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = "Empezar",
-                        fontSize = 22.sp,
-                        color = Color.White
+                        fontSize = 20.sp,
+                        color = Color.White,
+                        fontFamily = LseFontFamily
                     )
                 }
 
-                Spacer(modifier = Modifier.height(30.dp))
+                Spacer(modifier = Modifier.height(34.dp))
 
-                // Hashtags / etiqueta social
+                // Hashtags con contraste mejorado
                 Text(
                     text = "#MASCA   #LSE   #2Bach",
-                    fontSize = 13.sp,
-                    color = Color(0xFFB3E5FC)
+                    fontSize = 14.sp,
+                    color = Color(0xFFCCE6FF)
                 )
             }
 
-            // Botón Créditos abajo a la derecha (igual funcional)
+            // Botón Créditos abajo a la derecha
             Button(
                 onClick = { showCredits = true },
                 modifier = Modifier
@@ -449,7 +664,7 @@ fun HomeScreen(
                 Text(text = "Créditos")
             }
 
-            // Overlay de créditos (igual que antes)
+            // Overlay de créditos
             if (showCredits) {
                 Box(
                     modifier = Modifier
@@ -541,209 +756,100 @@ fun HomeScreen(
                     }
                 }
             }
-        }
-    }
-}
 
-// ✨ Palabras flotantes con efecto máquina de escribir + ligera rotación
-// ✨ Palabras flotantes dobles con efecto máquina de escribir + ligera rotación
-// ✨ Palabras flotantes dobles con efecto máquina de escribir + ligera rotación
-// ✨ Palabras flotantes dobles con efecto máquina de escribir + rotación + glow
-@Composable
-fun FloatingTypewriterWordsAboveTitle(
-    modifier: Modifier = Modifier
-) {
-    // Palabras / frases relacionadas con LSE e inclusión
-    val words = listOf(
-        "Inclusión",
-        "Accesibilidad",
-        "Igualdad",
-        "Empatía",
-        "Comunicación",
-        "Lengua de signos",
-        "Diversidad",
-        "Respeto",
-        "Integración social",
-        "Conexión",
-        "Libertad",
-        "Identidad",
-        "Convivencia",
-        "Señas que unen",
-        "Iguales en derechos",
-        "Las señas hablan",
-        "Sin barreras",
-        "Somos comunidad",
-        "Puentes, no muros"
-    )
+            // 🔥 OVERLAY DE FLASHCARD EXPANDIDA (POR ENCIMA DE TODO)
+            if (expandedCardIndex != null) {
+                val card = infoCards[expandedCardIndex!!]
 
-    // Paleta suave morado/azul/turquesa
-    val palette = listOf(
-        Color(0xFFB3E5FC),
-        Color(0xFF80DEEA),
-        Color(0xFFCE93D8),
-        Color(0xFF81D4FA),
-        Color(0xFFB39DDB)
-    )
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color(0xDD050010))
+                        .clickable { /* consumir clics, no cerrar aquí */ },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .padding(24.dp)
+                            .background(
+                                brush = Brush.linearGradient(card.background),
+                                shape = RoundedCornerShape(26.dp)
+                            )
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .verticalScroll(rememberScrollState())
+                                .padding(20.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .height(28.dp)
+                                        .width(5.dp)
+                                        .background(
+                                            brush = Brush.verticalGradient(
+                                                listOf(
+                                                    card.accent,
+                                                    card.accent.copy(alpha = 0.6f)
+                                                )
+                                            ),
+                                            shape = RoundedCornerShape(50)
+                                        )
+                                )
 
-    val infiniteTransition = rememberInfiniteTransition(label = "double_words")
+                                Spacer(modifier = Modifier.width(12.dp))
 
-    // Cursor compartido
-    val cursorAlpha by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(700),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "cursor_alpha"
-    )
+                                Text(
+                                    text = card.title,
+                                    fontSize = 18.sp,
+                                    fontFamily = LseFontFamily,
+                                    color = Color(0xFF2B2840)
+                                )
+                            }
 
-    // Rotación suave (-5° a +5°)
-    val rotation by infiniteTransition.animateFloat(
-        initialValue = -5f,
-        targetValue = 5f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "rotation"
-    )
+                            Spacer(modifier = Modifier.height(12.dp))
 
-    // Flotación vertical ligera (-6dp a +6dp)
-    val floatOffset by infiniteTransition.animateFloat(
-        initialValue = -6f,
-        targetValue = 6f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2500, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "float"
-    )
+                            // Párrafos ordenados
+                            card.paragraphs.forEachIndexed { index, p ->
+                                Text(
+                                    text = p,
+                                    fontSize = 14.sp,
+                                    lineHeight = 20.sp,
+                                    color = Color(0xFF3B3555)
+                                )
+                                if (index != card.paragraphs.lastIndex) {
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                }
+                            }
 
-    Box(modifier = modifier.fillMaxSize()) {
+                            Spacer(modifier = Modifier.height(16.dp))
 
-        // ZONAS BIEN SEPARADAS
-
-        // Palabra 1 → zona superior izquierda (un poco más baja que antes)
-        val leftX = listOf((-110).dp, (-85).dp, (-60).dp, (-40).dp)
-        val upperY = listOf(
-            70.dp,   // antes 60.dp
-            95.dp,   // antes 85.dp
-            120.dp   // antes 110.dp
-        )
-
-        // Palabra 2 → zona algo más baja y a la derecha (también bajada un poco)
-        val rightX = listOf(40.dp, 70.dp, 100.dp, 130.dp)
-        val lowerY = listOf(
-            140.dp,  // antes 130.dp
-            165.dp,  // antes 155.dp
-            190.dp   // antes 180.dp
-        )
-
-        // 🔥 Sub-composable reutilizable
-        @Composable
-        fun AnimatedFloatingWord(
-            seed: Int,
-            xPositions: List<Dp>,
-            yPositions: List<Dp>
-        ) {
-            var wordIndex by remember(seed) { mutableIntStateOf(seed % words.size) }
-            var currentText by remember(seed) { mutableStateOf("") }
-            var deleting by remember(seed) { mutableStateOf(false) }
-            var targetX by remember(seed) { mutableStateOf(xPositions.random()) }
-            var targetY by remember(seed) { mutableStateOf(yPositions.random()) }
-            var currentFullLength by remember(seed) { mutableIntStateOf(words[wordIndex].length) }
-            var color by remember(seed) { mutableStateOf(palette.random()) }
-
-            // Animación suave hacia la nueva posición
-            val animatedX by animateDpAsState(
-                targetValue = targetX,
-                animationSpec = tween(durationMillis = 600, easing = FastOutSlowInEasing),
-                label = "word_x_$seed"
-            )
-            val animatedYBase by animateDpAsState(
-                targetValue = targetY,
-                animationSpec = tween(durationMillis = 600, easing = FastOutSlowInEasing),
-                label = "word_y_$seed"
-            )
-
-            val animatedY = animatedYBase + floatOffset.dp
-
-            // Progreso de escritura para un pequeño fade in/out
-            val typeProgress =
-                if (currentFullLength > 0) currentText.length.toFloat() / currentFullLength.toFloat()
-                else 0f
-            val localAlpha = 0.3f + 0.7f * typeProgress.coerceIn(0f, 1f)
-
-            // Máquina de escribir con velocidades variables
-            LaunchedEffect(Unit) {
-                while (true) {
-                    val full = words[wordIndex]
-                    currentFullLength = full.length
-
-                    if (!deleting) {
-                        if (currentText.length < full.length) {
-                            currentText = full.substring(0, currentText.length + 1)
-
-                            // velocidad aleatoria 65–120 ms
-                            val delayMs = Random.nextLong(65L, 120L)
-                            delay(delayMs)
-                        } else {
-                            // pausa aleatoria cuando la palabra está completa
-                            delay(Random.nextLong(700L, 1300L))
-                            deleting = true
-                        }
-                    } else {
-                        if (currentText.isNotEmpty()) {
-                            currentText = currentText.dropLast(1)
-                            delay(Random.nextLong(45L, 90L))
-                        } else {
-                            // nueva palabra + nueva posición + nuevo color
-                            deleting = false
-                            wordIndex = (wordIndex + 1) % words.size
-                            targetX = xPositions.random()
-                            targetY = yPositions.random()
-                            color = palette.random()
-                            delay(200L)
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.End)
+                                    .clickable { expandedCardIndex = null }
+                                    .background(
+                                        color = Color(0x33000000),
+                                        shape = RoundedCornerShape(50)
+                                    )
+                                    .padding(horizontal = 14.dp, vertical = 8.dp)
+                            ) {
+                                Text(
+                                    text = "Cerrar",
+                                    fontSize = 13.sp,
+                                    color = Color(0xFF2B2840)
+                                )
+                            }
                         }
                     }
                 }
             }
-
-            val display = if (cursorAlpha > 0.5f) "$currentText|" else "$currentText "
-
-            // Glow / pseudo-neón: texto duplicado detrás, más grande y transparente
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .offset(animatedX, animatedY)
-                    .rotate(rotation)
-            ) {
-                // Capa "glow"
-                // Capa principal
-                Text(
-                    text = display,
-                    fontSize = 20.sp,
-                    fontFamily = LseFontFamily2,
-                    color = color.copy(alpha = localAlpha),
-                )
-            }
         }
-
-        // ✨ 2 palabras siempre alejadas y vivas
-        AnimatedFloatingWord(
-            seed = 1,
-            xPositions = leftX,
-            yPositions = upperY
-        )
-
-        AnimatedFloatingWord(
-            seed = 99,
-            xPositions = rightX,
-            yPositions = lowerY
-        )
     }
 }
+
+// 🔹 Flashcards amigables, gorditas y pastel
+// 🔹 Flashcards amigables, gorditas y pastel con expansión al pulsar
 
 @Composable
 fun HolographicWaves(
@@ -751,7 +857,7 @@ fun HolographicWaves(
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "waves_transition")
 
-    // Fases animadas para tres ondas con distinta velocidad (movimiento horizontal)
+    // Fases animadas
     val phase1 by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = (2f * PI).toFloat(),
@@ -782,7 +888,7 @@ fun HolographicWaves(
         label = "wave_phase_3"
     )
 
-    // 🌊 Movimiento vertical suave de cada onda (sube/baja lentamente)
+    // Movimiento vertical
     val verticalShift1 by infiniteTransition.animateFloat(
         initialValue = -12f,
         targetValue = 12f,
@@ -825,7 +931,6 @@ fun HolographicWaves(
             verticalOffset: Float
         ) {
             val path = Path()
-            // baseY en píxeles + pequeño desplazamiento vertical animado
             val baseY = h * baseYRatio + verticalOffset
             val amplitude = h * amplitudeRatio
 
@@ -842,7 +947,6 @@ fun HolographicWaves(
                 x += step
             }
 
-            // Cerrar hacia abajo para poder rellenar
             path.lineTo(w, h)
             path.lineTo(0f, h)
             path.close()
@@ -854,16 +958,14 @@ fun HolographicWaves(
             )
         }
 
-        // Onda 1: morado claro, muy sutil
         drawWave(
-            baseYRatio = 0.78f,          // más cerca de la parte baja
-            amplitudeRatio = 0.04f,      // poca altura
-            color = Color(0x33BB86FC),   // alpha muy bajo
+            baseYRatio = 0.78f,
+            amplitudeRatio = 0.04f,
+            color = Color(0x33BB86FC),
             phase = phase1,
             verticalOffset = verticalShift1
         )
 
-        // Onda 2: lila brillante, todavía más suave
         drawWave(
             baseYRatio = 0.82f,
             amplitudeRatio = 0.05f,
@@ -872,7 +974,6 @@ fun HolographicWaves(
             verticalOffset = verticalShift2
         )
 
-        // Onda 3: azul violáceo, casi solo “bruma”
         drawWave(
             baseYRatio = 0.86f,
             amplitudeRatio = 0.06f,
@@ -888,7 +989,8 @@ fun CameraScreen(
     cameraExecutor: ExecutorService,
     handLandmarkerHelper: HandLandmarkerHelper?,
     gestureLabel: State<String?>,
-    gestureConfidence: State<Float?>
+    gestureConfidence: State<Float?>,
+    onBack: () -> Unit
 ) {
     val context = LocalContext.current
 
@@ -908,96 +1010,55 @@ fun CameraScreen(
         if (!hasCameraPermission) launcher.launch(Manifest.permission.CAMERA)
     }
 
-    Surface(modifier = Modifier.fillMaxSize()) {
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = Color.Black
+    ) {
         if (hasCameraPermission) {
             Box(modifier = Modifier.fillMaxSize()) {
 
+                // 📷 Cámara a pantalla completa
                 CameraPreview(
                     cameraExecutor = cameraExecutor,
                     handLandmarkerHelper = handLandmarkerHelper
                 )
 
+                // 🔮 Degradado superior para hacer legible el HUD
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(210.dp)
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color(0xAA0B021F),
+                                    Color(0x550B021F),
+                                    Color.Transparent
+                                )
+                            )
+                        )
+                        .align(Alignment.TopCenter)
+                )
+
+                // ✨ HUD de gesto (integrado, moderno)
                 val label = gestureLabel.value
                 val conf = gestureConfidence.value
 
-                if (label != null && conf != null) {
-                    val targetFraction = conf.coerceIn(0f, 1f)
+                GestureHud(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 40.dp, start = 24.dp, end = 24.dp),
+                    label = label,
+                    confidence = conf
+                )
 
-                    var animatedFraction by remember { mutableFloatStateOf(targetFraction) }
-
-                    LaunchedEffect(targetFraction) {
-                        val start = animatedFraction
-                        val durationMs = 200
-                        val frameMs = 16
-                        val steps = durationMs / frameMs
-                        for (i in 1..steps) {
-                            val t = i / steps.toFloat()
-                            animatedFraction = start + (targetFraction - start) * t
-                            delay(frameMs.toLong())
-                        }
-                        animatedFraction = targetFraction
-                    }
-
-                    val clampedFraction = animatedFraction.coerceIn(0f, 1f)
-                    val percent = (clampedFraction * 100).toInt()
-
-                    val barColor = when {
-                        clampedFraction < 0.4f -> Color(0xFFFF5555)
-                        clampedFraction < 0.7f -> Color(0xFFFFEE58)
-                        else -> Color(0xFF66BB6A)
-                    }
-
-                    Column(
-                        modifier = Modifier
-                            .align(Alignment.TopCenter)
-                            .padding(top = 48.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .background(
-                                    color = Color(0xAA000000),
-                                    shape = RoundedCornerShape(20.dp)
-                                )
-                                .padding(horizontal = 20.dp, vertical = 12.dp)
-                        ) {
-                            Text(
-                                text = label,
-                                fontSize = 28.sp,
-                                color = Color.White
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        Box(
-                            modifier = Modifier
-                                .width(220.dp)
-                                .height(8.dp)
-                                .background(
-                                    color = Color(0x55FFFFFF),
-                                    shape = RoundedCornerShape(4.dp)
-                                )
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth(clampedFraction)
-                                    .height(8.dp)
-                                    .background(
-                                        color = barColor,
-                                        shape = RoundedCornerShape(4.dp)
-                                    )
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        Text(
-                            text = "$percent%",
-                            fontSize = 14.sp,
-                            color = Color.White
-                        )
-                    }
+                // 🔙 Botón volver al menú (abajo a la derecha)
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(20.dp)
+                ) {
+                    BackToMenuButton(onClick = onBack)
                 }
             }
         } else {
@@ -1005,9 +1066,162 @@ fun CameraScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
-                Text("Permiso de cámara DENEGADO")
+                Text(
+                    "Permiso de cámara DENEGADO",
+                    color = Color.White
+                )
             }
         }
+    }
+}
+
+@Composable
+fun GestureHud(
+    modifier: Modifier = Modifier,
+    label: String?,
+    confidence: Float?
+) {
+    // Fade-in suave del HUD
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { visible = true }
+
+    val alpha by animateFloatAsState(
+        targetValue = if (visible) 1f else 0f,
+        animationSpec = tween(600),
+        label = "hud_alpha"
+    )
+
+    // Animación del valor de confianza
+    val targetFraction = (confidence ?: 0f).coerceIn(0f, 1f)
+    var animatedFraction by remember { mutableStateOf(targetFraction) }
+
+    LaunchedEffect(targetFraction) {
+        val start = animatedFraction
+        val durationMs = 220
+        val frameMs = 16
+        val steps = durationMs / frameMs
+        for (i in 1..steps) {
+            val t = i / steps.toFloat()
+            animatedFraction = start + (targetFraction - start) * t
+            delay(frameMs.toLong())
+        }
+        animatedFraction = targetFraction
+    }
+
+    val clampedFraction = animatedFraction.coerceIn(0f, 1f)
+    val percent = (clampedFraction * 100).toInt()
+
+    val barColor = when {
+        clampedFraction < 0.4f -> Color(0xFFFF5555)
+        clampedFraction < 0.7f -> Color(0xFFFFEE58)
+        else -> Color(0xFF66BB6A)
+    }
+
+    val displayLabel = label ?: "Esperando gesto..."
+    val isIdle = label == null
+
+    // 🟣 HUD TRANSLÚCIDO estilo glass overlay
+    Box(
+        modifier = modifier.alpha(alpha)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            Color(0xAA1A0D2E),   // 66% transparencia
+                            Color(0x662B1E80),   // 40% transparencia
+                            Color(0x55291D72)    // 33% transparencia
+                        )
+                    ),
+                    shape = RoundedCornerShape(26.dp)
+                )
+                .padding(horizontal = 22.dp, vertical = 18.dp)
+        ) {
+            Column(
+                horizontalAlignment = Alignment.Start,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+
+                // 🟣 Texto del gesto
+                Text(
+                    text = displayLabel,
+                    fontSize = if (isIdle) 22.sp else 28.sp,
+                    color = Color.White,
+                    fontFamily = LseFontFamily
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // 🟩 Barra de confianza tipo "capsule"
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(12.dp)
+                        .background(
+                            color = Color(0x50FFFFFF),
+                            shape = RoundedCornerShape(50)
+                        )
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(clampedFraction)
+                            .height(12.dp)
+                            .background(
+                                color = barColor,
+                                shape = RoundedCornerShape(50)
+                            )
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // 🔵 Porcentaje tipo "pill"
+                Box(
+                    modifier = Modifier
+                        .background(
+                            color = Color(0x33000000),
+                            shape = RoundedCornerShape(50)
+                        )
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = if (isIdle) "--%" else "$percent%",
+                        fontSize = 14.sp,
+                        color = Color.White
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun BackToMenuButton(
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .background(
+                brush = Brush.linearGradient(
+                    colors = listOf(
+                        Color(0xAA1A0D2E),   // 66% transparencia
+                        Color(0x662B1E80),   // 40%
+                        Color(0x55291D72)    // 33%
+                    )
+                ),
+                shape = RoundedCornerShape(50)
+            )
+            .clickable { onClick() }
+            .padding(horizontal = 22.dp, vertical = 12.dp)
+    ) {
+        Text(
+            text = "MENU",
+            color = Color.White,
+            fontSize = 16.sp,
+            fontFamily = LseFontFamily
+        )
     }
 }
 
