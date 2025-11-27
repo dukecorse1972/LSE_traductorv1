@@ -756,8 +756,7 @@ fun HomeScreen(
                     }
                 }
             }
-
-            // 🔥 OVERLAY DE FLASHCARD EXPANDIDA (POR ENCIMA DE TODO)
+            
             if (expandedCardIndex != null) {
                 val card = infoCards[expandedCardIndex!!]
 
