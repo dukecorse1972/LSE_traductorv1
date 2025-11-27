@@ -10,7 +10,6 @@ import android.media.MediaPlayer
 import android.os.Bundle
 import android.util.Log
 
-
 // ------------------------------------------
 // 📌 2. Activity + Permissions (AndroidX)
 // ------------------------------------------
@@ -18,7 +17,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-
 
 // ------------------------------------------
 // 📌 3. CameraX (Procesamiento de cámara)
@@ -29,7 +27,6 @@ import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview as CameraXPreview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
-
 
 // ------------------------------------------
 // 📌 4. Compose – Animations
@@ -42,12 +39,13 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-
+import androidx.compose.animation.core.Animatable
 
 // ------------------------------------------
 // 📌 5. Compose – Foundation / Layout
 // ------------------------------------------
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -58,14 +56,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.layout.Row
-
+import androidx.compose.ui.graphics.graphicsLayer
 
 // ------------------------------------------
 // 📌 6. Compose – Material, Runtime y UI
@@ -79,22 +76,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.animation.core.Animatable
-
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-
 
 // ------------------------------------------
 // 📌 7. Utilidades AndroidX y Kotlin
@@ -107,7 +103,7 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlinx.coroutines.delay
 
-
+// Fuente personalizada
 val LseFontFamily = FontFamily(
     Font(R.font.good_times_rg, weight = FontWeight.Normal)
 )
@@ -118,9 +114,11 @@ data class CardInfo(
     val shortBody: String,
     val accent: Color,
     val background: List<Color>,
-    val paragraphs: List<String>
+    val paragraphs: List<String>,
+    val imageRes: Int         // 👈 imagen asociada a la card
 )
 
+// ⚠️ Ajusta los R.drawable.* a los nombres reales de tus imágenes
 val infoCards = listOf(
     CardInfo(
         title = "Lengua de Signos Española",
@@ -131,7 +129,8 @@ val infoCards = listOf(
             "La Lengua de Signos Española (LSE) es una lengua completa, con gramática y estructura propias. No se limita a traducir palabra por palabra el castellano, sino que organiza la información de una manera visual y espacial.",
             "Cada seña, cada expresión facial y cada movimiento del cuerpo aportan matices de significado. Por eso, la LSE no es un “apoyo” al habla, sino una forma legítima y plena de comunicación.",
             "Conocer y respetar la LSE significa reconocer la cultura, la identidad y la historia de la comunidad sorda que la utiliza cada día."
-        )
+        ),
+        imageRes = R.drawable.lse_card
     ),
     CardInfo(
         title = "Inclusión real",
@@ -142,7 +141,8 @@ val infoCards = listOf(
             "Cuando hablamos de inclusión real, no basta con que una persona “pueda estar” en un lugar. Es importante que también pueda participar, opinar y entender todo lo que ocurre a su alrededor.",
             "La accesibilidad comunicativa incluye intérpretes de LSE, subtítulos, materiales visuales y herramientas tecnológicas que reducen las barreras entre personas oyentes y sordas.",
             "Diseñar espacios accesibles no solo beneficia a la comunidad sorda: mejora la comunicación para todos y hace que los entornos sean más claros, respetuosos y humanos."
-        )
+        ),
+        imageRes = R.drawable.inclusion_card
     ),
     CardInfo(
         title = "Tecnología que acompaña",
@@ -153,7 +153,8 @@ val infoCards = listOf(
             "La tecnología, bien usada, puede convertirse en una aliada de la accesibilidad. No sustituye a las personas ni a la Lengua de Signos, pero puede ayudar a visibilizar, enseñar y apoyar procesos de aprendizaje.",
             "Proyectos como MAS-CA GESTURES muestran que es posible combinar modelos de reconocimiento, diseño de interfaz y sensibilidad social para acercar la LSE a más gente.",
             "El reto está en que la tecnología no hable por la comunidad sorda, sino que camine a su lado, respetando sus tiempos, su cultura y sus necesidades reales."
-        )
+        ),
+        imageRes = R.drawable.tecnologia_card
     ),
     CardInfo(
         title = "Aprender a señar",
@@ -164,10 +165,10 @@ val infoCards = listOf(
             "Acercarse a la Lengua de Signos es abrir la puerta a una forma distinta de percibir y compartir el mundo. No se trata solo de memorizar señas, sino de aprender a mirar, a esperar y a comunicar con todo el cuerpo.",
             "Cada persona oyente que aprende LSE está tendiendo un puente hacia la comunidad sorda: facilita la convivencia en clase, en el trabajo y en la vida diaria.",
             "Aunque al principio cueste, cada seña aprendida es un pequeño paso hacia una sociedad donde comunicarse no dependa únicamente del oído, sino también de las manos, la mirada y la empatía."
-        )
+        ),
+        imageRes = R.drawable.aprender_card
     )
 )
-
 
 // 🔹 Flashcards amigables, gorditas y pastel (versión compacta, clicable)
 @Composable
@@ -258,56 +259,71 @@ fun InfoFlashcards(
                     .clickable { onCardClick(currentIndex) }
                     .padding(horizontal = 16.dp, vertical = 10.dp)
             ) {
-                Column {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
 
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    // 🖼 Imagen pequeña redondeada
+                    Image(
+                        painter = painterResource(id = card.imageRes),
+                        contentDescription = card.title,
+                        modifier = Modifier
+                            .size(52.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                    )
 
-                        Box(
-                            modifier = Modifier
-                                .height(24.dp)
-                                .width(4.dp)
-                                .background(
-                                    brush = Brush.verticalGradient(
-                                        listOf(
-                                            card.accent,
-                                            card.accent.copy(alpha = 0.6f)
-                                        )
-                                    ),
-                                    shape = RoundedCornerShape(50)
-                                )
-                        )
+                    Spacer(modifier = Modifier.width(12.dp))
 
-                        Spacer(modifier = Modifier.width(10.dp))
-
-                        Column {
-                            Text(
-                                text = card.title,
-                                fontSize = 14.sp,
-                                fontFamily = LseFontFamily,
-                                color = Color(0xFF2B2840)
-                            )
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
 
                             Box(
                                 modifier = Modifier
-                                    .padding(top = 2.dp)
-                                    .width(40.dp)
-                                    .height(2.dp)
+                                    .height(24.dp)
+                                    .width(4.dp)
                                     .background(
-                                        color = card.accent.copy(alpha = 0.6f),
+                                        brush = Brush.verticalGradient(
+                                            listOf(
+                                                card.accent,
+                                                card.accent.copy(alpha = 0.6f)
+                                            )
+                                        ),
                                         shape = RoundedCornerShape(50)
                                     )
                             )
+
+                            Spacer(modifier = Modifier.width(10.dp))
+
+                            Column {
+                                Text(
+                                    text = card.title,
+                                    fontSize = 14.sp,
+                                    fontFamily = LseFontFamily,
+                                    color = Color(0xFF2B2840)
+                                )
+
+                                Box(
+                                    modifier = Modifier
+                                        .padding(top = 2.dp)
+                                        .width(40.dp)
+                                        .height(2.dp)
+                                        .background(
+                                            color = card.accent.copy(alpha = 0.6f),
+                                            shape = RoundedCornerShape(50)
+                                        )
+                                )
+                            }
                         }
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        Text(
+                            text = card.shortBody,
+                            fontSize = 13.sp,
+                            lineHeight = 18.sp,
+                            color = Color(0xFF3B3555)
+                        )
                     }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Text(
-                        text = card.shortBody,
-                        fontSize = 13.sp,
-                        lineHeight = 18.sp,
-                        color = Color(0xFF3B3555)
-                    )
                 }
             }
         }
@@ -573,7 +589,7 @@ fun HomeScreen(
                 modifier = Modifier.fillMaxSize()
             )
 
-// 🔹 Flashcards más abajo y más gorditas
+            // 🔹 Flashcards más abajo (solo si NO hay una expandida)
             if (expandedCardIndex == null) {
                 InfoFlashcards(
                     modifier = Modifier
@@ -756,7 +772,7 @@ fun HomeScreen(
                     }
                 }
             }
-            
+
             if (expandedCardIndex != null) {
                 val card = infoCards[expandedCardIndex!!]
 
@@ -808,6 +824,18 @@ fun HomeScreen(
 
                             Spacer(modifier = Modifier.height(12.dp))
 
+                            // 🖼 Imagen grande en la card expandida
+                            Image(
+                                painter = painterResource(id = card.imageRes),
+                                contentDescription = card.title,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(170.dp)
+                                    .clip(RoundedCornerShape(20.dp))
+                            )
+
+                            Spacer(modifier = Modifier.height(16.dp))
+
                             // Párrafos ordenados
                             card.paragraphs.forEachIndexed { index, p ->
                                 Text(
@@ -847,9 +875,7 @@ fun HomeScreen(
     }
 }
 
-// 🔹 Flashcards amigables, gorditas y pastel
-// 🔹 Flashcards amigables, gorditas y pastel con expansión al pulsar
-
+// Ondas de fondo holográficas
 @Composable
 fun HolographicWaves(
     modifier: Modifier = Modifier
@@ -1129,9 +1155,9 @@ fun GestureHud(
                 .background(
                     brush = Brush.linearGradient(
                         colors = listOf(
-                            Color(0xAA1A0D2E),   // 66% transparencia
-                            Color(0x662B1E80),   // 40% transparencia
-                            Color(0x55291D72)    // 33% transparencia
+                            Color(0xAA1A0D2E),
+                            Color(0x662B1E80),
+                            Color(0x55291D72)
                         )
                     ),
                     shape = RoundedCornerShape(26.dp)
@@ -1205,9 +1231,9 @@ fun BackToMenuButton(
             .background(
                 brush = Brush.linearGradient(
                     colors = listOf(
-                        Color(0xAA1A0D2E),   // 66% transparencia
-                        Color(0x662B1E80),   // 40%
-                        Color(0x55291D72)    // 33%
+                        Color(0xAA1A0D2E),
+                        Color(0x662B1E80),
+                        Color(0x55291D72)
                     )
                 ),
                 shape = RoundedCornerShape(50)
