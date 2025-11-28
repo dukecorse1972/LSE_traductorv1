@@ -171,13 +171,14 @@ val infoCards = listOf(
 )
 
 // 🔹 Flashcards amigables, gorditas y pastel (versión compacta, clicable)
+// 👉 AHORA el índice viene de fuera y se notifica hacia fuera
 @Composable
 fun InfoFlashcards(
     modifier: Modifier = Modifier,
+    currentIndex: Int,
+    onIndexChange: (Int) -> Unit,
     onCardClick: (Int) -> Unit
 ) {
-    var currentIndex by remember { mutableStateOf(0) }
-
     // -1 = izquierda, 0 = centro, 1 = derecha
     val slideX = remember { Animatable(-1f) }
 
@@ -193,11 +194,11 @@ fun InfoFlashcards(
         label = "card_pulse_scale"
     )
 
-    // Carrusel con animación
+    // Carrusel con animación, empezando en currentIndex (del padre)
     LaunchedEffect(Unit) {
-        var idx = 0
+        var idx = currentIndex
         while (true) {
-            currentIndex = idx
+            onIndexChange(idx)   // avisamos al HomeScreen de qué índice se está mostrando
 
             slideX.snapTo(-1f)
 
@@ -231,14 +232,12 @@ fun InfoFlashcards(
     val cardAlpha = 0.45f + 0.55f * centerFactor
 
     Box(modifier = modifier) {
-
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .offset(x = (slideX.value * 420f).dp)
                 .padding(horizontal = 24.dp)
         ) {
-
             // Flashcard compacta
             Box(
                 modifier = Modifier
@@ -542,6 +541,9 @@ fun HomeScreen(
     var showCredits by remember { mutableStateOf(false) }
     var expandedCardIndex by remember { mutableStateOf<Int?>(null) }
 
+    // 👇 índice del carrusel que se mantiene aunque se oculte InfoFlashcards
+    var carouselIndex by remember { mutableStateOf(0) }
+
     // 🔹 Fade-in del bloque central
     var startAnimation by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
@@ -590,16 +592,19 @@ fun HomeScreen(
             )
 
             // 🔹 Flashcards más abajo (solo si NO hay una expandida)
-            if (expandedCardIndex == null) {
-                InfoFlashcards(
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .padding(top = 90.dp),
-                    onCardClick = { index ->
-                        expandedCardIndex = index
-                    }
-                )
-            }
+            InfoFlashcards(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 90.dp)
+                    .alpha(if (expandedCardIndex == null) 1f else 0f),
+                currentIndex = carouselIndex,
+                onIndexChange = { newIndex ->
+                    carouselIndex = newIndex
+                },
+                onCardClick = { index ->
+                    expandedCardIndex = index
+                }
+            )
 
             // Contenido principal centrado con fade-in
             Column(
@@ -773,6 +778,7 @@ fun HomeScreen(
                 }
             }
 
+            // Overlay de flashcard expandida
             if (expandedCardIndex != null) {
                 val card = infoCards[expandedCardIndex!!]
 
