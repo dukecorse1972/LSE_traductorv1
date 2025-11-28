@@ -9,16 +9,13 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.AudioAttributes
 import android.media.SoundPool
-import android.net.Uri // 👈 ESTE ERA EL QUE FALTABA
+import android.net.Uri
 import android.os.Bundle
 import android.speech.RecognizerIntent
 import android.util.Log
 import android.util.Size
 import android.util.SparseIntArray
 import android.widget.VideoView
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.PlayCircleOutline
-import androidx.compose.material3.IconButton
 
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -41,8 +38,11 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.PlayCircleOutline
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -63,19 +63,26 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 
-// Imports para Web Scraping y Corrutinas
+// Imports de ML Kit y Jsoup
+import com.google.mlkit.common.model.DownloadConditions
+import com.google.mlkit.nl.translate.TranslateLanguage
+import com.google.mlkit.nl.translate.Translation
+import com.google.mlkit.nl.translate.TranslatorOptions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import org.jsoup.Jsoup
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 import kotlin.math.PI
 import kotlin.math.sin
 import kotlin.math.sqrt
 
 // ------------------------------------------
-// 📌 2. FUENTES Y DATOS
+// 📌 2. CONFIGURACIÓN Y DATOS
 // ------------------------------------------
 
 val LseFontFamily = FontFamily(
@@ -98,9 +105,9 @@ val infoCards = listOf(
         accent = Color(0xFFFB8CFF),
         background = listOf(Color(0xFFFFE6FF), Color(0xFFF3D9FF)),
         paragraphs = listOf(
-            "La Lengua de Signos Española (LSE) es una lengua completa, con gramática y estructura propias. No se limita a traducir palabra por palabra el castellano, sino que organiza la información de una manera visual y espacial.",
-            "Cada seña, cada expresión facial y cada movimiento del cuerpo aportan matices de significado. Por eso, la LSE no es un “apoyo” al habla, sino una forma legítima y plena de comunicación.",
-            "Conocer y respetar la LSE significa reconocer la cultura, la identidad y la historia de la comunidad sorda que la utiliza cada día."
+            "La Lengua de Signos Española (LSE) es una lengua completa, con gramática y estructura propias.",
+            "Cada seña, cada expresión facial y cada movimiento del cuerpo aportan matices de significado.",
+            "Conocer y respetar la LSE significa reconocer la cultura, la identidad y la historia de la comunidad sorda."
         ),
         imageRes = R.drawable.lse_card
     ),
@@ -110,9 +117,9 @@ val infoCards = listOf(
         accent = Color(0xFF80DEEA),
         background = listOf(Color(0xFFE0FBFF), Color(0xFFCCF7FF)),
         paragraphs = listOf(
-            "Cuando hablamos de inclusión real, no basta con que una persona “pueda estar” en un lugar. Es importante que también pueda participar, opinar y entender todo lo que ocurre a su alrededor.",
-            "La accesibilidad comunicativa incluye intérpretes de LSE, subtítulos, materiales visuales y herramientas tecnológicas que reducen las barreras entre personas oyentes y sordas.",
-            "Diseñar espacios accesibles no solo beneficia a la comunidad sorda: mejora la comunicación para todos y hace que los entornos sean más claros, respetuosos y humanos."
+            "Cuando hablamos de inclusión real, no basta con que una persona “pueda estar” en un lugar.",
+            "La accesibilidad comunicativa incluye intérpretes de LSE, subtítulos y herramientas tecnológicas.",
+            "Diseñar espacios accesibles mejora la comunicación para todos."
         ),
         imageRes = R.drawable.inclusion_card
     ),
@@ -122,9 +129,9 @@ val infoCards = listOf(
         accent = Color(0xFFFFF59D),
         background = listOf(Color(0xFFFFFDE7), Color(0xFFFFF9C4)),
         paragraphs = listOf(
-            "La tecnología, bien usada, puede convertirse en una aliada de la accesibilidad. No sustituye a las personas ni a la Lengua de Signos, pero puede ayudar a visibilizar, enseñar y apoyar procesos de aprendizaje.",
-            "Proyectos como MAS-CA GESTURES muestran que es posible combinar modelos de reconocimiento, diseño de interfaz y sensibilidad social para acercar la LSE a más gente.",
-            "El reto está en que la tecnología no hable por la comunidad sorda, sino que camine a su lado, respetando sus tiempos, su cultura y sus necesidades reales."
+            "La tecnología, bien usada, puede convertirse en una aliada de la accesibilidad.",
+            "Proyectos como MAS-CA GESTURES muestran que es posible combinar modelos de reconocimiento y diseño social.",
+            "El reto está en que la tecnología no hable por la comunidad sorda, sino que camine a su lado."
         ),
         imageRes = R.drawable.tecnologia_card
     ),
@@ -134,13 +141,60 @@ val infoCards = listOf(
         accent = Color(0xFFB39DDB),
         background = listOf(Color(0xFFF2E7FE), Color(0xFFE9D7FF)),
         paragraphs = listOf(
-            "Acercarse a la Lengua de Signos es abrir la puerta a una forma distinta de percibir y compartir el mundo. No se trata solo de memorizar señas, sino de aprender a mirar, a esperar y a comunicar con todo el cuerpo.",
-            "Cada persona oyente que aprende LSE está tendiendo un puente hacia la comunidad sorda: facilita la convivencia en clase, en el trabajo y en la vida diaria.",
-            "Aunque al principio cueste, cada seña aprendida es un pequeño paso hacia una sociedad donde comunicarse no dependa únicamente del oído, sino también de las manos, la mirada y la empatía."
+            "Acercarse a la Lengua de Signos es abrir la puerta a una forma distinta de percibir el mundo.",
+            "Cada persona oyente que aprende LSE está tendiendo un puente hacia la comunidad sorda.",
+            "Cada seña aprendida es un pequeño paso hacia una sociedad más inclusiva."
         ),
         imageRes = R.drawable.aprender_card
     )
 )
+
+// 🌍 CONFIGURACIÓN DE IDIOMAS (ML KIT + SPREADTHESIGN)
+data class SignLanguage(
+    val name: String,
+    val flag: String,
+    val urlCode: String,      // Para SpreadTheSign (ej: en.us)
+    val mlKitCode: String     // Para Google Translate (ej: "en")
+)
+
+val availableLanguages = listOf(
+    SignLanguage("España (LSE)", "🇪🇸", "es.es", TranslateLanguage.SPANISH),
+    SignLanguage("EE.UU. (ASL)", "🇺🇸", "en.us", TranslateLanguage.ENGLISH),
+    SignLanguage("Reino Unido (BSL)", "🇬🇧", "en.gb", TranslateLanguage.ENGLISH),
+    SignLanguage("Francia (LSF)", "🇫🇷", "fr.fr", TranslateLanguage.FRENCH),
+    SignLanguage("Alemania (DGS)", "🇩🇪", "de.de", TranslateLanguage.GERMAN),
+    SignLanguage("Italia (LIS)", "🇮🇹", "it.it", TranslateLanguage.ITALIAN),
+    SignLanguage("Portugal (LGP)", "🇵🇹", "pt.pt", TranslateLanguage.PORTUGUESE)
+)
+
+// FUNCIÓN SUSPENDIDA PARA TRADUCIR CON ML KIT
+suspend fun translateText(text: String, targetLang: String): String {
+    if (targetLang == TranslateLanguage.SPANISH) return text // No traducir si es español
+
+    return suspendCancellableCoroutine { continuation ->
+        val options = TranslatorOptions.Builder()
+            .setSourceLanguage(TranslateLanguage.SPANISH)
+            .setTargetLanguage(targetLang)
+            .build()
+
+        val translator = Translation.getClient(options)
+        val conditions = DownloadConditions.Builder().build()
+
+        translator.downloadModelIfNeeded(conditions)
+            .addOnSuccessListener {
+                translator.translate(text)
+                    .addOnSuccessListener { translatedText ->
+                        continuation.resume(translatedText)
+                    }
+                    .addOnFailureListener { e ->
+                        continuation.resumeWithException(e)
+                    }
+            }
+            .addOnFailureListener { e ->
+                continuation.resumeWithException(e)
+            }
+    }
+}
 
 enum class Screen { HOME, CAMERA }
 
@@ -332,7 +386,7 @@ class MainActivity : ComponentActivity() {
 }
 
 // ----------------------------------------------------------------------
-// 🚀 MENÚ DESLIZABLE Y PANTALLA DE VOZ (CON JSOUP)
+// 🚀 UI COMPOSABLES
 // ----------------------------------------------------------------------
 
 @Composable
@@ -391,34 +445,58 @@ fun VoiceToSignScreen(context: Context) {
     var recognizedText by remember { mutableStateOf("Pulsa el micro y di: Hola") }
     var currentVideoUrl by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(false) }
+    var loadingMessage by remember { mutableStateOf("") }
     var hasSearched by remember { mutableStateOf(false) }
-
-    // 🆕 NUEVO ESTADO: Controla si el vídeo se ve en pantalla completa
     var isVideoExpanded by remember { mutableStateOf(false) }
 
-    // Corrutina de búsqueda (IGUAL QUE ANTES)
-    LaunchedEffect(recognizedText) {
+    // Idioma
+    var selectedLang by remember { mutableStateOf(availableLanguages[0]) }
+    var showMenu by remember { mutableStateOf(false) }
+    var translatedTerm by remember { mutableStateOf("") }
+
+    LaunchedEffect(recognizedText, selectedLang) {
         if (recognizedText.contains("Pulsa el micro") || recognizedText.contains("Error") || recognizedText.isBlank()) return@LaunchedEffect
+
         isLoading = true
         hasSearched = true
         currentVideoUrl = null
-
-        // Si cambiamos de palabra, salimos del modo pantalla completa por si acaso
         isVideoExpanded = false
 
-        Log.d("SCRAPING", "--- INICIANDO BÚSQUEDA BLINDADA --- Palabra: $recognizedText")
+        // 1. TRADUCCIÓN CON ML KIT
+        val originalWord = recognizedText.trim().lowercase()
+        var wordToSearch = originalWord
+
+        if (selectedLang.mlKitCode != TranslateLanguage.SPANISH) {
+            loadingMessage = "Traduciendo a ${selectedLang.name}..."
+            try {
+                val translation = withContext(Dispatchers.IO) {
+                    translateText(originalWord, selectedLang.mlKitCode)
+                }
+                wordToSearch = translation.lowercase()
+                translatedTerm = wordToSearch
+                Log.d("TRANSLATOR", "Traducción exitosa: $originalWord -> $wordToSearch")
+            } catch (e: Exception) {
+                Log.e("TRANSLATOR", "Fallo al traducir: ${e.message}")
+                wordToSearch = originalWord
+            }
+        } else {
+            translatedTerm = ""
+        }
+
+        // 2. SCRAPING BLINDADO
+        loadingMessage = "Buscando vídeo en la nube..."
 
         val videoFound = withContext(Dispatchers.IO) {
             try {
-                val cleanText = recognizedText.trim().replace(" ", "+")
-                val urlBusqueda = "https://www.spreadthesign.com/es.es/search/?q=$cleanText"
+                val cleanText = wordToSearch.replace(" ", "+")
+                val urlBusqueda = "https://www.spreadthesign.com/${selectedLang.urlCode}/search/?q=$cleanText"
 
                 val connection = Jsoup.connect(urlBusqueda)
                     .userAgent("Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36")
                     .header("Accept-Language", "es-ES,es;q=0.9")
                     .referrer("https://www.google.com/")
                     .ignoreHttpErrors(true)
-                    .timeout(10000)
+                    .timeout(15000)
 
                 val docLista = connection.get()
 
@@ -458,7 +536,6 @@ fun VoiceToSignScreen(context: Context) {
 
                 if (src != null) {
                     if (!src.startsWith("http")) src = "https://www.spreadthesign.com$src"
-                    Log.d("SCRAPING", "✅ VÍDEO FINAL EXTRAÍDO: $src")
                     src
                 } else {
                     null
@@ -483,27 +560,23 @@ fun VoiceToSignScreen(context: Context) {
         }
     }
 
-    // 🆕 Envolvemos todo en un Box para poder poner capas superpuestas
+    // INTERFAZ
     Box(modifier = Modifier.fillMaxSize()) {
-
-        // --- CAPA 1: Contenido Normal ---
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = 60.dp, start = 30.dp, end = 30.dp),
+                .padding(top = 50.dp, start = 30.dp, end = 30.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(
-                text = "MODO OYENTE",
-                fontSize = 26.sp,
-                fontFamily = LseFontFamily,
-                color = Color(0xFF80DEEA)
-            )
-            Text("Diccionario Online", fontSize = 15.sp, color = Color(0xFFB2EBF2))
 
-            Spacer(modifier = Modifier.height(40.dp))
+            // 1. TÍTULO CENTRADO (COMO ANTES)
+            Text("MODO OYENTE", fontSize = 26.sp, fontFamily = LseFontFamily, color = Color(0xFF80DEEA))
+            Spacer(modifier = Modifier.height(6.dp))
+            Text("Traductor Global AI", fontSize = 15.sp, color = Color(0xFFB2EBF2))
 
-            // CAJA DEL VÍDEO (Vista previa pequeña)
+            Spacer(modifier = Modifier.height(30.dp))
+
+            // 2. CAJA DE VÍDEO
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -511,7 +584,6 @@ fun VoiceToSignScreen(context: Context) {
                     .clip(RoundedCornerShape(30.dp))
                     .background(Color.Black.copy(alpha = 0.6f))
                     .shadow(10.dp, RoundedCornerShape(30.dp))
-                    // 🆕 Hacemos que la caja sea clicable solo si hay vídeo
                     .clickable(enabled = currentVideoUrl != null) {
                         isVideoExpanded = true
                     },
@@ -521,39 +593,21 @@ fun VoiceToSignScreen(context: Context) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         androidx.compose.material3.CircularProgressIndicator(color = Color(0xFF80DEEA))
                         Spacer(modifier = Modifier.height(10.dp))
-                        Text("Buscando vídeo...", color = Color(0xFF80DEEA), fontSize = 12.sp)
+                        Text(loadingMessage, color = Color(0xFF80DEEA), fontSize = 12.sp)
                     }
                 }
-                // 🆕 Solo mostramos el reproductor pequeño SI NO está expandido
-                // (Para evitar tener dos vídeos reproduciéndose a la vez)
                 else if (currentVideoUrl != null && !isVideoExpanded) {
                     LseVideoPlayer(
                         videoUrl = currentVideoUrl!!,
                         modifier = Modifier.fillMaxSize()
                     )
-                    // 🆕 Indicador visual de que se puede pulsar
-                    Icon(
-                        Icons.Default.PlayCircleOutline,
-                        contentDescription = null,
-                        tint = Color.White.copy(alpha = 0.5f),
-                        modifier = Modifier.size(50.dp).align(Alignment.Center)
-                    )
-                    Text(
-                        text = "Toca para ampliar",
-                        color = Color.White.copy(alpha = 0.7f),
-                        fontSize = 10.sp,
-                        modifier = Modifier.align(Alignment.BottomCenter).padding(10.dp)
-                    )
+                    Icon(Icons.Default.PlayCircleOutline, null, tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(50.dp).align(Alignment.Center))
+                    Text("Toca para ampliar", color = Color.White.copy(alpha = 0.7f), fontSize = 10.sp, modifier = Modifier.align(Alignment.BottomCenter).padding(10.dp))
                 } else if (hasSearched && currentVideoUrl == null) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            imageVector = Icons.Filled.Videocam,
-                            contentDescription = null,
-                            tint = Color(0xFFFF5555),
-                            modifier = Modifier.size(50.dp)
-                        )
+                        Icon(Icons.Filled.Videocam, null, tint = Color(0xFFFF5555), modifier = Modifier.size(50.dp))
                         Spacer(modifier = Modifier.height(10.dp))
-                        Text("No encontrado", color = Color(0xFFFF5555), fontWeight = FontWeight.Bold)
+                        Text("No encontrado en ${selectedLang.name}", color = Color(0xFFFF5555), fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     }
                 } else {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -563,33 +617,65 @@ fun VoiceToSignScreen(context: Context) {
                 }
             }
 
-            Spacer(modifier = Modifier.height(30.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
-            Text(
-                text = "\"$recognizedText\"",
-                fontSize = 20.sp,
-                color = Color.White,
-                fontWeight = FontWeight.Bold
-            )
+            // 3. DESPLEGABLE DE IDIOMA (AHORA DEBAJO DEL VIDEO)
+            Box {
+                Button(
+                    onClick = { showMenu = true },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0x33FFFFFF)),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                    shape = RoundedCornerShape(50)
+                ) {
+                    Text(
+                        text = "Idioma: ${selectedLang.flag} ${selectedLang.name}",
+                        color = Color.White,
+                        fontSize = 14.sp
+                    )
+                }
+
+                DropdownMenu(
+                    expanded = showMenu,
+                    onDismissRequest = { showMenu = false },
+                    modifier = Modifier.background(Color(0xFF1C1C1E))
+                ) {
+                    availableLanguages.forEach { lang ->
+                        DropdownMenuItem(
+                            text = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(lang.flag, fontSize = 20.sp)
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Text(lang.name, color = Color.White)
+                                }
+                            },
+                            onClick = {
+                                selectedLang = lang
+                                showMenu = false
+                            }
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // 4. TEXTO RECONOCIDO
+            Text("\"$recognizedText\"", fontSize = 20.sp, color = Color.White, fontWeight = FontWeight.Bold)
+            if (selectedLang.urlCode != "es.es" && hasSearched) {
+                Text("Traducción: $translatedTerm", fontSize = 14.sp, color = Color(0xFF80DEEA))
+            }
 
             Spacer(modifier = Modifier.weight(1f))
 
-            // BOTÓN MICRO
+            // 5. BOTÓN MICRÓFONO
             val infiniteTransition = rememberInfiniteTransition(label = "mic")
-            val scale by infiniteTransition.animateFloat(
-                initialValue = 1f, targetValue = 1.05f,
-                animationSpec = infiniteRepeatable(tween(1000), RepeatMode.Reverse), label = "scale"
-            )
+            val scale by infiniteTransition.animateFloat(1f, 1.05f, infiniteRepeatable(tween(1000), RepeatMode.Reverse), label = "scale")
 
             Box(
                 modifier = Modifier
-                    .size(100.dp)
-                    .scale(scale)
+                    .size(100.dp).scale(scale)
                     .shadow(20.dp, CircleShape, spotColor = Color(0xFF00E5FF))
-                    .background(
-                        Brush.radialGradient(listOf(Color(0xFF00E5FF), Color(0xFF008299))),
-                        CircleShape
-                    )
+                    .background(Brush.radialGradient(listOf(Color(0xFF00E5FF), Color(0xFF008299))), CircleShape)
                     .clickable {
                         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
                         intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
@@ -600,43 +686,58 @@ fun VoiceToSignScreen(context: Context) {
             ) {
                 Icon(Icons.Filled.Mic, null, tint = Color.White, modifier = Modifier.size(50.dp))
             }
-
             Spacer(modifier = Modifier.height(50.dp))
         }
 
-        // 🆕 --- CAPA 2: Vídeo a Pantalla Completa (Overlay) ---
-        // Se muestra encima de todo si isVideoExpanded es true
+        // CAPA DE PANTALLA COMPLETA
         if (isVideoExpanded && currentVideoUrl != null) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color.Black)
-                    .clickable(enabled = false) {} // Evita clicks en la capa de abajo
+                    .clickable(enabled = false) {}
             ) {
-                // El reproductor en grande
-                LseVideoPlayer(
-                    videoUrl = currentVideoUrl!!,
-                    modifier = Modifier.fillMaxSize().align(Alignment.Center)
-                )
-
-                // Botón de Cerrar (X)
+                LseVideoPlayer(videoUrl = currentVideoUrl!!, modifier = Modifier.fillMaxSize().align(Alignment.Center))
                 IconButton(
                     onClick = { isVideoExpanded = false },
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(24.dp)
-                        .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                    modifier = Modifier.align(Alignment.TopEnd).padding(24.dp).background(Color.Black.copy(alpha = 0.5f), CircleShape)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "Cerrar",
-                        tint = Color.White,
-                        modifier = Modifier.size(30.dp)
-                    )
+                    Icon(Icons.Default.Close, "Cerrar", tint = Color.White, modifier = Modifier.size(30.dp))
                 }
             }
         }
     }
+}
+
+// ---------------------------------------------------------
+// 📹 COMPONENTE REUTILIZABLE: REPRODUCTOR DE VÍDEO LSE
+// ---------------------------------------------------------
+@Composable
+fun LseVideoPlayer(
+    videoUrl: String,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val videoView = remember { VideoView(context) }
+
+    AndroidView(
+        factory = {
+            videoView.apply {
+                setOnPreparedListener { mp ->
+                    mp.isLooping = true
+                    start()
+                }
+            }
+        },
+        update = { view ->
+            if (view.tag != videoUrl) {
+                view.setVideoURI(Uri.parse(videoUrl))
+                view.start()
+                view.tag = videoUrl
+            }
+        },
+        modifier = modifier
+    )
 }
 
 // ----------------------------------------------------------------------
@@ -1084,41 +1185,6 @@ fun CameraPreview(
 
             previewView
         }
-    )
-}
-
-// ---------------------------------------------------------
-// 📹 COMPONENTE REUTILIZABLE: REPRODUCTOR DE VÍDEO LSE
-// ---------------------------------------------------------
-@Composable
-fun LseVideoPlayer(
-    videoUrl: String,
-    modifier: Modifier = Modifier
-) {
-    val context = LocalContext.current
-    // Usamos remember para mantener la instancia del VideoView
-    val videoView = remember { VideoView(context) }
-
-    AndroidView(
-        factory = {
-            videoView.apply {
-                setOnPreparedListener { mp ->
-                    mp.isLooping = true
-                    start()
-                }
-            }
-        },
-        update = { view ->
-            // 👇 CORRECCIÓN:
-            // Como 'view.videoURI' no existe para leer, usamos 'view.tag'
-            // para guardar la URL actual y comparar.
-            if (view.tag != videoUrl) {
-                view.setVideoURI(Uri.parse(videoUrl))
-                view.start()
-                view.tag = videoUrl // Guardamos la URL para la próxima vez
-            }
-        },
-        modifier = modifier
     )
 }
 
