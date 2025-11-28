@@ -72,5 +72,7 @@ dependencies {
     implementation("com.google.mediapipe:tasks-vision:0.10.29")
 
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.0")
+    implementation("androidx.compose.material:material-icons-extended:1.6.8")
+    implementation("org.jsoup:jsoup:1.16.1")
 
 }

@@ -1,29 +1,30 @@
 package com.example.lsegestures
 
 // ------------------------------------------
-// 📌 1. Android (Framework + Sistema)
+// 📌 1. IMPORTS
 // ------------------------------------------
 import android.Manifest
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.AudioAttributes
 import android.media.SoundPool
+import android.net.Uri // 👈 ESTE ERA EL QUE FALTABA
 import android.os.Bundle
+import android.speech.RecognizerIntent
 import android.util.Log
 import android.util.Size
 import android.util.SparseIntArray
+import android.widget.VideoView
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.PlayCircleOutline
+import androidx.compose.material3.IconButton
 
-// ------------------------------------------
-// 📌 2. Activity + Permissions (AndroidX)
-// ------------------------------------------
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 
-// ------------------------------------------
-// 📌 3. CameraX (Procesamiento de cámara)
-// ------------------------------------------
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
@@ -33,61 +34,24 @@ import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 
-// ------------------------------------------
-// 📌 4. Compose – Animations
-// ------------------------------------------
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.foundation.layout.offset
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.Animatable
-
-// ------------------------------------------
-// 📌 5. Compose – Foundation / Layout
-// ------------------------------------------
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.*
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.graphics.graphicsLayer
-
-// ------------------------------------------
-// 📌 6. Compose – Material, Runtime y UI
-// ------------------------------------------
-import androidx.compose.material3.Button
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.Fill // Importante para drawPath
+import androidx.compose.ui.draw.*
+import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.platform.LocalContext
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
@@ -96,19 +60,24 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-
-// ------------------------------------------
-// 📌 7. Utilidades AndroidX y Kotlin
-// ------------------------------------------
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.LocalLifecycleOwner
+
+// Imports para Web Scraping y Corrutinas
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
+import org.jsoup.Jsoup
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlin.math.PI
 import kotlin.math.sin
 import kotlin.math.sqrt
-import kotlinx.coroutines.delay
 
-// Fuente personalizada
+// ------------------------------------------
+// 📌 2. FUENTES Y DATOS
+// ------------------------------------------
+
 val LseFontFamily = FontFamily(
     Font(R.font.good_times_rg, weight = FontWeight.Normal)
 )
@@ -122,7 +91,6 @@ data class CardInfo(
     val imageRes: Int
 )
 
-// ⚠️ Asegúrate de que R.drawable.* existan en tu proyecto
 val infoCards = listOf(
     CardInfo(
         title = "Lengua de Signos Española",
@@ -174,124 +142,11 @@ val infoCards = listOf(
     )
 )
 
-@Composable
-fun InfoFlashcards(
-    modifier: Modifier = Modifier,
-    currentIndex: Int,
-    onIndexChange: (Int) -> Unit,
-    onCardClick: (Int) -> Unit
-) {
-    val slideX = remember { Animatable(-1f) }
-
-    val pulseTransition = rememberInfiniteTransition(label = "card_pulse")
-    val pulseScale by pulseTransition.animateFloat(
-        initialValue = 0.97f,
-        targetValue = 1.05f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1100, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "card_pulse_scale"
-    )
-
-    LaunchedEffect(Unit) {
-        var idx = currentIndex
-        while (true) {
-            onIndexChange(idx)
-
-            slideX.snapTo(-1f)
-            slideX.animateTo(
-                targetValue = 0f,
-                animationSpec = tween(550, easing = FastOutSlowInEasing)
-            )
-            delay(4000L)
-            slideX.animateTo(
-                targetValue = 1f,
-                animationSpec = tween(550, easing = FastOutSlowInEasing)
-            )
-            delay(150L)
-            idx = (idx + 1) % infoCards.size
-        }
-    }
-
-    val card = infoCards[currentIndex]
-    val centerFactor = (1f - kotlin.math.abs(slideX.value)).coerceIn(0f, 1f)
-    val cardAlpha = 0.45f + 0.55f * centerFactor
-
-    Box(modifier = modifier) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .offset(x = (slideX.value * 420f).dp)
-                .padding(horizontal = 24.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .graphicsLayer {
-                        scaleX = pulseScale
-                        scaleY = pulseScale
-                        alpha = cardAlpha
-                    }
-                    .shadow(14.dp, RoundedCornerShape(22.dp))
-                    .background(Brush.linearGradient(card.background), RoundedCornerShape(22.dp))
-                    .clickable { onCardClick(currentIndex) }
-                    .padding(horizontal = 16.dp, vertical = 10.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Image(
-                        painter = painterResource(id = card.imageRes),
-                        contentDescription = card.title,
-                        modifier = Modifier
-                            .size(52.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .height(24.dp)
-                                    .width(4.dp)
-                                    .background(
-                                        Brush.verticalGradient(
-                                            listOf(card.accent, card.accent.copy(alpha = 0.6f))
-                                        ),
-                                        RoundedCornerShape(50)
-                                    )
-                            )
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Column {
-                                Text(
-                                    text = card.title,
-                                    fontSize = 14.sp,
-                                    fontFamily = LseFontFamily,
-                                    color = Color(0xFF2B2840)
-                                )
-                                Box(
-                                    modifier = Modifier
-                                        .padding(top = 2.dp)
-                                        .width(40.dp)
-                                        .height(2.dp)
-                                        .background(card.accent.copy(alpha = 0.6f), RoundedCornerShape(50))
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = card.shortBody,
-                            fontSize = 13.sp,
-                            lineHeight = 18.sp,
-                            color = Color(0xFF3B3555)
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
 enum class Screen { HOME, CAMERA }
+
+// ------------------------------------------
+// 📌 3. MAIN ACTIVITY
+// ------------------------------------------
 
 class MainActivity : ComponentActivity() {
 
@@ -430,8 +285,15 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             var currentScreen by remember { mutableStateOf(Screen.HOME) }
+            val context = LocalContext.current
+
             when (currentScreen) {
-                Screen.HOME -> HomeScreen(onStartClick = { currentScreen = Screen.CAMERA })
+                Screen.HOME -> {
+                    SwipeableMainScreen(
+                        onStartCamera = { currentScreen = Screen.CAMERA },
+                        context = context
+                    )
+                }
                 Screen.CAMERA -> CameraScreen(
                     cameraExecutor = cameraExecutor,
                     handLandmarkerHelper = handLandmarkerHelper,
@@ -469,8 +331,320 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+// ----------------------------------------------------------------------
+// 🚀 MENÚ DESLIZABLE Y PANTALLA DE VOZ (CON JSOUP)
+// ----------------------------------------------------------------------
+
 @Composable
-fun HomeScreen(onStartClick: () -> Unit) {
+fun SwipeableMainScreen(
+    onStartCamera: () -> Unit,
+    context: Context
+) {
+    val pagerState = rememberPagerState(pageCount = { 2 })
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    listOf(Color(0xFF0B021F), Color(0xFF3F2B96))
+                )
+            )
+    ) {
+        HolographicWaves(modifier = Modifier.fillMaxSize())
+
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxSize()
+        ) { page ->
+            when (page) {
+                0 -> {
+                    HomeScreenContent(onStartClick = onStartCamera)
+                }
+                1 -> {
+                    VoiceToSignScreen(context = context)
+                }
+            }
+        }
+
+        Row(
+            Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 20.dp)
+        ) {
+            repeat(2) { iteration ->
+                val color = if (pagerState.currentPage == iteration) Color.White else Color.White.copy(alpha = 0.3f)
+                Box(
+                    modifier = Modifier
+                        .padding(4.dp)
+                        .clip(CircleShape)
+                        .background(color)
+                        .size(8.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun VoiceToSignScreen(context: Context) {
+    var recognizedText by remember { mutableStateOf("Pulsa el micro y di: Hola") }
+    var currentVideoUrl by remember { mutableStateOf<String?>(null) }
+    var isLoading by remember { mutableStateOf(false) }
+    var hasSearched by remember { mutableStateOf(false) }
+
+    // 🆕 NUEVO ESTADO: Controla si el vídeo se ve en pantalla completa
+    var isVideoExpanded by remember { mutableStateOf(false) }
+
+    // Corrutina de búsqueda (IGUAL QUE ANTES)
+    LaunchedEffect(recognizedText) {
+        if (recognizedText.contains("Pulsa el micro") || recognizedText.contains("Error") || recognizedText.isBlank()) return@LaunchedEffect
+        isLoading = true
+        hasSearched = true
+        currentVideoUrl = null
+
+        // Si cambiamos de palabra, salimos del modo pantalla completa por si acaso
+        isVideoExpanded = false
+
+        Log.d("SCRAPING", "--- INICIANDO BÚSQUEDA BLINDADA --- Palabra: $recognizedText")
+
+        val videoFound = withContext(Dispatchers.IO) {
+            try {
+                val cleanText = recognizedText.trim().replace(" ", "+")
+                val urlBusqueda = "https://www.spreadthesign.com/es.es/search/?q=$cleanText"
+
+                val connection = Jsoup.connect(urlBusqueda)
+                    .userAgent("Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36")
+                    .header("Accept-Language", "es-ES,es;q=0.9")
+                    .referrer("https://www.google.com/")
+                    .ignoreHttpErrors(true)
+                    .timeout(10000)
+
+                val docLista = connection.get()
+
+                if (connection.response().statusCode() == 403) return@withContext null
+
+                var urlFicha: String? = null
+                if (docLista.location().contains("/word/")) {
+                    urlFicha = docLista.location()
+                } else {
+                    val fichaLink = docLista.select("a[href*=/word/]").first()
+                    if (fichaLink != null) urlFicha = fichaLink.attr("abs:href")
+                }
+
+                if (urlFicha == null) return@withContext null
+
+                val docFicha = if (urlFicha == docLista.location()) docLista else Jsoup.connect(urlFicha)
+                    .userAgent("Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36")
+                    .referrer(urlBusqueda)
+                    .timeout(10000)
+                    .get()
+
+                var src: String? = null
+                val videoSource = docFicha.select("video source").first()
+                if (videoSource != null) src = videoSource.attr("src")
+
+                if (src.isNullOrEmpty()) {
+                    val videoTag = docFicha.select("video").first()
+                    src = videoTag?.attr("src")
+                }
+
+                if (src.isNullOrEmpty()) {
+                    val htmlBruto = docFicha.html()
+                    val regex = """https://media\.spreadthesign\.com/video/mp4/[^"]+\.mp4""".toRegex()
+                    val match = regex.find(htmlBruto)
+                    src = match?.value
+                }
+
+                if (src != null) {
+                    if (!src.startsWith("http")) src = "https://www.spreadthesign.com$src"
+                    Log.d("SCRAPING", "✅ VÍDEO FINAL EXTRAÍDO: $src")
+                    src
+                } else {
+                    null
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                null
+            }
+        }
+        currentVideoUrl = videoFound
+        isLoading = false
+    }
+
+    val speechLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val data = result.data
+            val results = data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+            val text = results?.get(0)?.lowercase() ?: ""
+            recognizedText = text
+        }
+    }
+
+    // 🆕 Envolvemos todo en un Box para poder poner capas superpuestas
+    Box(modifier = Modifier.fillMaxSize()) {
+
+        // --- CAPA 1: Contenido Normal ---
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = 60.dp, start = 30.dp, end = 30.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "MODO OYENTE",
+                fontSize = 26.sp,
+                fontFamily = LseFontFamily,
+                color = Color(0xFF80DEEA)
+            )
+            Text("Diccionario Online", fontSize = 15.sp, color = Color(0xFFB2EBF2))
+
+            Spacer(modifier = Modifier.height(40.dp))
+
+            // CAJA DEL VÍDEO (Vista previa pequeña)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(250.dp)
+                    .clip(RoundedCornerShape(30.dp))
+                    .background(Color.Black.copy(alpha = 0.6f))
+                    .shadow(10.dp, RoundedCornerShape(30.dp))
+                    // 🆕 Hacemos que la caja sea clicable solo si hay vídeo
+                    .clickable(enabled = currentVideoUrl != null) {
+                        isVideoExpanded = true
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                if (isLoading) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        androidx.compose.material3.CircularProgressIndicator(color = Color(0xFF80DEEA))
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text("Buscando vídeo...", color = Color(0xFF80DEEA), fontSize = 12.sp)
+                    }
+                }
+                // 🆕 Solo mostramos el reproductor pequeño SI NO está expandido
+                // (Para evitar tener dos vídeos reproduciéndose a la vez)
+                else if (currentVideoUrl != null && !isVideoExpanded) {
+                    LseVideoPlayer(
+                        videoUrl = currentVideoUrl!!,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                    // 🆕 Indicador visual de que se puede pulsar
+                    Icon(
+                        Icons.Default.PlayCircleOutline,
+                        contentDescription = null,
+                        tint = Color.White.copy(alpha = 0.5f),
+                        modifier = Modifier.size(50.dp).align(Alignment.Center)
+                    )
+                    Text(
+                        text = "Toca para ampliar",
+                        color = Color.White.copy(alpha = 0.7f),
+                        fontSize = 10.sp,
+                        modifier = Modifier.align(Alignment.BottomCenter).padding(10.dp)
+                    )
+                } else if (hasSearched && currentVideoUrl == null) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = Icons.Filled.Videocam,
+                            contentDescription = null,
+                            tint = Color(0xFFFF5555),
+                            modifier = Modifier.size(50.dp)
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text("No encontrado", color = Color(0xFFFF5555), fontWeight = FontWeight.Bold)
+                    }
+                } else {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(Icons.Filled.Videocam, null, tint = Color.Gray, modifier = Modifier.size(50.dp))
+                        Text("El vídeo aparecerá aquí", color = Color.Gray, fontSize = 12.sp)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(30.dp))
+
+            Text(
+                text = "\"$recognizedText\"",
+                fontSize = 20.sp,
+                color = Color.White,
+                fontWeight = FontWeight.Bold
+            )
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            // BOTÓN MICRO
+            val infiniteTransition = rememberInfiniteTransition(label = "mic")
+            val scale by infiniteTransition.animateFloat(
+                initialValue = 1f, targetValue = 1.05f,
+                animationSpec = infiniteRepeatable(tween(1000), RepeatMode.Reverse), label = "scale"
+            )
+
+            Box(
+                modifier = Modifier
+                    .size(100.dp)
+                    .scale(scale)
+                    .shadow(20.dp, CircleShape, spotColor = Color(0xFF00E5FF))
+                    .background(
+                        Brush.radialGradient(listOf(Color(0xFF00E5FF), Color(0xFF008299))),
+                        CircleShape
+                    )
+                    .clickable {
+                        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+                        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "es-ES")
+                        try { speechLauncher.launch(intent) } catch (_: Exception) { recognizedText = "Error micro" }
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Filled.Mic, null, tint = Color.White, modifier = Modifier.size(50.dp))
+            }
+
+            Spacer(modifier = Modifier.height(50.dp))
+        }
+
+        // 🆕 --- CAPA 2: Vídeo a Pantalla Completa (Overlay) ---
+        // Se muestra encima de todo si isVideoExpanded es true
+        if (isVideoExpanded && currentVideoUrl != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black)
+                    .clickable(enabled = false) {} // Evita clicks en la capa de abajo
+            ) {
+                // El reproductor en grande
+                LseVideoPlayer(
+                    videoUrl = currentVideoUrl!!,
+                    modifier = Modifier.fillMaxSize().align(Alignment.Center)
+                )
+
+                // Botón de Cerrar (X)
+                IconButton(
+                    onClick = { isVideoExpanded = false },
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(24.dp)
+                        .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Cerrar",
+                        tint = Color.White,
+                        modifier = Modifier.size(30.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ----------------------------------------------------------------------
+// 🏠 PANTALLA HOME
+// ----------------------------------------------------------------------
+
+@Composable
+fun HomeScreenContent(onStartClick: () -> Unit) {
     var showCredits by remember { mutableStateOf(false) }
     var expandedCardIndex by remember { mutableStateOf<Int?>(null) }
     var carouselIndex by remember { mutableStateOf(0) }
@@ -486,124 +660,116 @@ fun HomeScreen(onStartClick: () -> Unit) {
         label = "start_button_scale"
     )
 
-    Surface(modifier = Modifier.fillMaxSize()) {
-        Box(
+    Box(modifier = Modifier.fillMaxSize()) {
+        InfoFlashcards(
             modifier = Modifier
-                .fillMaxSize()
-                .background(Brush.verticalGradient(listOf(Color(0xFF0B021F), Color(0xFF3F2B96))))
+                .align(Alignment.TopCenter)
+                .padding(top = 90.dp)
+                .alpha(if (expandedCardIndex == null) 1f else 0f),
+            currentIndex = carouselIndex,
+            onIndexChange = { carouselIndex = it },
+            onCardClick = { expandedCardIndex = it }
+        )
+
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .align(Alignment.Center)
+                .padding(horizontal = 32.dp)
+                .alpha(alpha)
         ) {
-            HolographicWaves(modifier = Modifier.fillMaxSize())
+            Text("MAS-CA TRADUCTOR", fontSize = 26.sp, fontFamily = LseFontFamily, color = Color.White)
+            Spacer(modifier = Modifier.height(6.dp))
+            Text("Reconocimiento de gestos en tiempo real", fontSize = 15.sp, color = Color(0xFFCED4FF))
+            Spacer(modifier = Modifier.height(32.dp))
 
-            InfoFlashcards(
+            Box(
                 modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 90.dp)
-                    .alpha(if (expandedCardIndex == null) 1f else 0f),
-                currentIndex = carouselIndex,
-                onIndexChange = { carouselIndex = it },
-                onCardClick = { expandedCardIndex = it }
-            )
-
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .padding(horizontal = 32.dp)
-                    .alpha(alpha)
+                    .size(160.dp)
+                    .scale(scale)
+                    .background(
+                        Brush.radialGradient(listOf(Color(0xFFBB86FC), Color(0xFF7B4AF7))),
+                        CircleShape
+                    )
+                    .shadow(22.dp, CircleShape, ambientColor = Color(0x884A2AFF), spotColor = Color(0x884A2AFF))
+                    .clickable { onStartClick() },
+                contentAlignment = Alignment.Center
             ) {
-                Text("MAS-CA TRADUCTOR", fontSize = 26.sp, fontFamily = LseFontFamily, color = Color.White)
-                Spacer(modifier = Modifier.height(6.dp))
-                Text("Reconocimiento de gestos en tiempo real", fontSize = 15.sp, color = Color(0xFFCED4FF))
-                Spacer(modifier = Modifier.height(32.dp))
+                Text("Empezar", fontSize = 20.sp, color = Color.White, fontFamily = LseFontFamily)
+            }
+            Spacer(modifier = Modifier.height(34.dp))
+            Text("#MASCA   #LSE   #2Bach", fontSize = 14.sp, color = Color(0xFFCCE6FF))
+        }
 
+        Button(
+            onClick = { showCredits = true },
+            modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+            shape = RoundedCornerShape(50)
+        ) {
+            Text("Créditos")
+        }
+
+        if (showCredits) {
+            Box(modifier = Modifier.fillMaxSize().background(Color(0x99000000)), contentAlignment = Alignment.Center) {
+                Column(
+                    modifier = Modifier
+                        .padding(24.dp)
+                        .background(Color(0xFF1C1C1E), RoundedCornerShape(24.dp))
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.Start
+                ) {
+                    Text("✨ Créditos", fontSize = 22.sp, color = Color.White)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text("Equipo MAS-CA", fontSize = 18.sp, color = Color(0xFFBB86FC))
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Alumnos:\n• Dario\n• Manuel\n• Raul", fontSize = 14.sp, color = Color.White)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Driver:\nWladimir López de Zamora", fontSize = 14.sp, color = Color.White)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text("Instituto:\nI.E.S Hermanos Amoros\n2º Bachillerato", fontSize = 14.sp, color = Color.White)
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Button(onClick = { showCredits = false }) { Text("Cerrar") }
+                }
+            }
+        }
+
+        if (expandedCardIndex != null) {
+            val card = infoCards[expandedCardIndex!!]
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0xDD050010))
+                    .clickable { },
+                contentAlignment = Alignment.Center
+            ) {
                 Box(
                     modifier = Modifier
-                        .size(160.dp)
-                        .scale(scale)
-                        .background(
-                            Brush.radialGradient(listOf(Color(0xFFBB86FC), Color(0xFF7B4AF7))),
-                            CircleShape
-                        )
-                        .shadow(22.dp, CircleShape, ambientColor = Color(0x884A2AFF), spotColor = Color(0x884A2AFF))
-                        .clickable { onStartClick() },
-                    contentAlignment = Alignment.Center
+                        .padding(24.dp)
+                        .background(Brush.linearGradient(card.background), RoundedCornerShape(26.dp))
                 ) {
-                    Text("Empezar", fontSize = 20.sp, color = Color.White, fontFamily = LseFontFamily)
-                }
-                Spacer(modifier = Modifier.height(34.dp))
-                Text("#MASCA   #LSE   #2Bach", fontSize = 14.sp, color = Color(0xFFCCE6FF))
-            }
-
-            Button(
-                onClick = { showCredits = true },
-                modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
-                shape = RoundedCornerShape(50)
-            ) {
-                Text("Créditos")
-            }
-
-            if (showCredits) {
-                Box(modifier = Modifier.fillMaxSize().background(Color(0x99000000)), contentAlignment = Alignment.Center) {
                     Column(
                         modifier = Modifier
-                            .padding(24.dp)
-                            .background(Color(0xFF1C1C1E), RoundedCornerShape(24.dp))
-                            .padding(24.dp),
-                        horizontalAlignment = Alignment.Start
+                            .verticalScroll(rememberScrollState())
+                            .padding(20.dp)
                     ) {
-                        Text("✨ Créditos", fontSize = 22.sp, color = Color.White)
+                        Text(card.title, fontSize = 18.sp, fontFamily = LseFontFamily, color = Color(0xFF2B2840))
                         Spacer(modifier = Modifier.height(12.dp))
-                        Text("Equipo MAS-CA", fontSize = 18.sp, color = Color(0xFFBB86FC))
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text("Alumnos:\n• Dario\n• Manuel\n• Raul", fontSize = 14.sp, color = Color.White)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text("Driver:\nWladimir López de Zamora", fontSize = 14.sp, color = Color.White)
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text("Instituto:\nI.E.S Hermanos Amoros\n2º Bachillerato", fontSize = 14.sp, color = Color.White)
-                        Spacer(modifier = Modifier.height(20.dp))
-                        Button(onClick = { showCredits = false }) { Text("Cerrar") }
-                    }
-                }
-            }
-
-            if (expandedCardIndex != null) {
-                val card = infoCards[expandedCardIndex!!]
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color(0xDD050010))
-                        .clickable { },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .padding(24.dp)
-                            .background(Brush.linearGradient(card.background), RoundedCornerShape(26.dp))
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .verticalScroll(rememberScrollState())
-                                .padding(20.dp)
+                        Image(
+                            painter = painterResource(id = card.imageRes),
+                            contentDescription = card.title,
+                            modifier = Modifier.fillMaxWidth().height(170.dp).clip(RoundedCornerShape(20.dp))
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        card.paragraphs.forEach { p ->
+                            Text(p, fontSize = 14.sp, lineHeight = 20.sp, color = Color(0xFF3B3555))
+                            Spacer(modifier = Modifier.height(10.dp))
+                        }
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Box(
+                            modifier = Modifier.align(Alignment.End).clickable { expandedCardIndex = null }
+                                .background(Color(0x33000000), RoundedCornerShape(50)).padding(14.dp, 8.dp)
                         ) {
-                            Text(card.title, fontSize = 18.sp, fontFamily = LseFontFamily, color = Color(0xFF2B2840))
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Image(
-                                painter = painterResource(id = card.imageRes),
-                                contentDescription = card.title,
-                                modifier = Modifier.fillMaxWidth().height(170.dp).clip(RoundedCornerShape(20.dp))
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
-                            card.paragraphs.forEach { p ->
-                                Text(p, fontSize = 14.sp, lineHeight = 20.sp, color = Color(0xFF3B3555))
-                                Spacer(modifier = Modifier.height(10.dp))
-                            }
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Box(
-                                modifier = Modifier.align(Alignment.End).clickable { expandedCardIndex = null }
-                                    .background(Color(0x33000000), RoundedCornerShape(50)).padding(14.dp, 8.dp)
-                            ) {
-                                Text("Cerrar", fontSize = 13.sp, color = Color(0xFF2B2840))
-                            }
+                            Text("Cerrar", fontSize = 13.sp, color = Color(0xFF2B2840))
                         }
                     }
                 }
@@ -613,8 +779,126 @@ fun HomeScreen(onStartClick: () -> Unit) {
 }
 
 // ----------------------------------------------------
-// 🔧 CORRECCIÓN 1: Argumentos nombrados en drawPath
+// 🔧 RESTO DE COMPONENTES
 // ----------------------------------------------------
+
+@Composable
+fun InfoFlashcards(
+    modifier: Modifier = Modifier,
+    currentIndex: Int,
+    onIndexChange: (Int) -> Unit,
+    onCardClick: (Int) -> Unit
+) {
+    val slideX = remember { Animatable(-1f) }
+
+    val pulseTransition = rememberInfiniteTransition(label = "card_pulse")
+    val pulseScale by pulseTransition.animateFloat(
+        initialValue = 0.97f,
+        targetValue = 1.05f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1100, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "card_pulse_scale"
+    )
+
+    LaunchedEffect(Unit) {
+        var idx = currentIndex
+        while (true) {
+            onIndexChange(idx)
+
+            slideX.snapTo(-1f)
+            slideX.animateTo(
+                targetValue = 0f,
+                animationSpec = tween(550, easing = FastOutSlowInEasing)
+            )
+            delay(4000L)
+            slideX.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(550, easing = FastOutSlowInEasing)
+            )
+            delay(150L)
+            idx = (idx + 1) % infoCards.size
+        }
+    }
+
+    val card = infoCards[currentIndex]
+    val centerFactor = (1f - kotlin.math.abs(slideX.value)).coerceIn(0f, 1f)
+    val cardAlpha = 0.45f + 0.55f * centerFactor
+
+    Box(modifier = modifier) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .offset(x = (slideX.value * 420f).dp)
+                .padding(horizontal = 24.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer {
+                        scaleX = pulseScale
+                        scaleY = pulseScale
+                        alpha = cardAlpha
+                    }
+                    .shadow(14.dp, RoundedCornerShape(22.dp))
+                    .background(Brush.linearGradient(card.background), RoundedCornerShape(22.dp))
+                    .clickable { onCardClick(currentIndex) }
+                    .padding(horizontal = 16.dp, vertical = 10.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Image(
+                        painter = painterResource(id = card.imageRes),
+                        contentDescription = card.title,
+                        modifier = Modifier
+                            .size(52.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .height(24.dp)
+                                    .width(4.dp)
+                                    .background(
+                                        Brush.verticalGradient(
+                                            listOf(card.accent, card.accent.copy(alpha = 0.6f))
+                                        ),
+                                        RoundedCornerShape(50)
+                                    )
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = card.title,
+                                    fontSize = 14.sp,
+                                    fontFamily = LseFontFamily,
+                                    color = Color(0xFF2B2840)
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .padding(top = 2.dp)
+                                        .width(40.dp)
+                                        .height(2.dp)
+                                        .background(card.accent.copy(alpha = 0.6f), RoundedCornerShape(50))
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = card.shortBody,
+                            fontSize = 13.sp,
+                            lineHeight = 18.sp,
+                            color = Color(0xFF3B3555)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 fun HolographicWaves(modifier: Modifier = Modifier) {
     val infiniteTransition = rememberInfiniteTransition(label = "waves_transition")
@@ -639,8 +923,6 @@ fun HolographicWaves(modifier: Modifier = Modifier) {
             path.lineTo(w, h)
             path.lineTo(0f, h)
             path.close()
-
-            // 👇 AQUÍ ESTABA EL ERROR. Usamos "style = Fill" explícitamente.
             drawPath(path = path, color = color, style = Fill)
         }
         drawWave(0.78f, 0.04f, Color(0x33BB86FC), phase1)
@@ -748,9 +1030,6 @@ fun BackToMenuButton(onClick: () -> Unit) {
     }
 }
 
-// ----------------------------------------------------
-// 🔧 CORRECCIÓN 2: ResolutionSelector (Nuevo API)
-// ----------------------------------------------------
 @Composable
 fun CameraPreview(
     cameraExecutor: ExecutorService,
@@ -770,7 +1049,6 @@ fun CameraPreview(
                     it.setSurfaceProvider(previewView.surfaceProvider)
                 }
 
-                // 👇 AQUÍ ESTABA EL ERROR. Usamos el nuevo sistema de selectores.
                 val resolutionSelector = ResolutionSelector.Builder()
                     .setResolutionStrategy(
                         ResolutionStrategy(
@@ -781,7 +1059,7 @@ fun CameraPreview(
                     .build()
 
                 val imageAnalysis = ImageAnalysis.Builder()
-                    .setResolutionSelector(resolutionSelector) // Nuevo método
+                    .setResolutionSelector(resolutionSelector)
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                     .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
                     .build()
@@ -806,6 +1084,41 @@ fun CameraPreview(
 
             previewView
         }
+    )
+}
+
+// ---------------------------------------------------------
+// 📹 COMPONENTE REUTILIZABLE: REPRODUCTOR DE VÍDEO LSE
+// ---------------------------------------------------------
+@Composable
+fun LseVideoPlayer(
+    videoUrl: String,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    // Usamos remember para mantener la instancia del VideoView
+    val videoView = remember { VideoView(context) }
+
+    AndroidView(
+        factory = {
+            videoView.apply {
+                setOnPreparedListener { mp ->
+                    mp.isLooping = true
+                    start()
+                }
+            }
+        },
+        update = { view ->
+            // 👇 CORRECCIÓN:
+            // Como 'view.videoURI' no existe para leer, usamos 'view.tag'
+            // para guardar la URL actual y comparar.
+            if (view.tag != videoUrl) {
+                view.setVideoURI(Uri.parse(videoUrl))
+                view.start()
+                view.tag = videoUrl // Guardamos la URL para la próxima vez
+            }
+        },
+        modifier = modifier
     )
 }
 
