@@ -75,6 +75,5 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended:1.6.8")
     implementation("org.jsoup:jsoup:1.16.1")
     implementation("com.google.mlkit:translate:17.0.2")
-    implementation("com.google.mlkit:image-labeling:17.0.7")
 
 }

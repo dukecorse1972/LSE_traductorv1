@@ -15,7 +15,7 @@ class TFLiteGestureClassifier(context: Context) {
         // Tu modelo: input (1, 60, 126), output (1, 4)
         private const val SEQ_LENGTH = 60
         private const val FEATURE_SIZE = 126
-        private const val NUM_CLASSES = 4
+        private const val NUM_CLASSES = 6
     }
 
     private var interpreter: Interpreter? = null

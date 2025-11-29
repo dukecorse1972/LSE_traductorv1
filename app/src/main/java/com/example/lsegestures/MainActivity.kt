@@ -235,10 +235,18 @@ class MainActivity : ComponentActivity() {
             .setAudioAttributes(audioAttributes)
             .build()
 
-        soundMap.put(1, soundPool.load(this, R.raw.hola, 1))
-        soundMap.put(2, soundPool.load(this, R.raw.adios, 1))
-        soundMap.put(3, soundPool.load(this, R.raw.autonomia, 1))
-        soundMap.put(4, soundPool.load(this, R.raw.igualdad, 1))
+        // ⚠️ Asegúrate de tener estos archivos en res/raw o la app crasheará al iniciar
+        // Si no los tienes, comenta estas 4 líneas
+        try {
+            soundMap.put(1, soundPool.load(this, R.raw.gracias, 1))
+            soundMap.put(2, soundPool.load(this, R.raw.buenos_dias, 1))
+            soundMap.put(3, soundPool.load(this, R.raw.triste, 1))
+            soundMap.put(4, soundPool.load(this, R.raw.alegre, 1))
+            soundMap.put(5, soundPool.load(this, R.raw.amigo, 1))
+            soundMap.put(6, soundPool.load(this, R.raw.ayuda, 1))
+        } catch (e: Exception) {
+            Log.e("SoundPool", "Error cargando sonidos: ${e.message}")
+        }
 
         gestureClassifier = TFLiteGestureClassifier(this)
         gestureClassifier?.runDummyInference()
@@ -323,7 +331,7 @@ class MainActivity : ComponentActivity() {
                         if (probs != null) {
                             val maxIdx = probs.indices.maxByOrNull { probs[it] } ?: 0
                             val confidence = probs[maxIdx]
-                            val labels = arrayOf("Hola", "Adios", "Autonomia", "Igualdad")
+                            val labels = arrayOf("Gracias", "Buenos dias", "Triste", "Alegre", "Amigo", "Ayuda")
                             val predicted = labels[maxIdx]
 
                             runOnUiThread {
@@ -372,10 +380,12 @@ class MainActivity : ComponentActivity() {
         if (label == lastPlayedGesture) return
 
         val soundId = when (label) {
-            "Hola" -> soundMap[1]
-            "Adios" -> soundMap[2]
-            "Autonomia" -> soundMap[3]
-            "Igualdad" -> soundMap[4]
+            "Gracias" -> soundMap[1]
+            "Buenos dias" -> soundMap[2]
+            "Triste" -> soundMap[3]
+            "Alegre" -> soundMap[4]
+            "Amigo" -> soundMap[5]
+            "Ayuda" -> soundMap[6]
             else -> 0
         }
         if (soundId != 0) {
@@ -394,6 +404,7 @@ fun SwipeableMainScreen(
     onStartCamera: () -> Unit,
     context: Context
 ) {
+    // 2 PÁGINAS SOLAMENTE: 0=Home, 1=Voz (Hemos quitado la 3)
     val pagerState = rememberPagerState(pageCount = { 2 })
 
     Box(
@@ -412,12 +423,8 @@ fun SwipeableMainScreen(
             modifier = Modifier.fillMaxSize()
         ) { page ->
             when (page) {
-                0 -> {
-                    HomeScreenContent(onStartClick = onStartCamera)
-                }
-                1 -> {
-                    VoiceToSignScreen(context = context)
-                }
+                0 -> HomeScreenContent(onStartClick = onStartCamera)
+                1 -> VoiceToSignScreen(context = context)
             }
         }
 
@@ -569,7 +576,7 @@ fun VoiceToSignScreen(context: Context) {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
 
-            // 1. TÍTULO CENTRADO (COMO ANTES)
+            // 1. TÍTULO CENTRADO
             Text("MODO OYENTE", fontSize = 26.sp, fontFamily = LseFontFamily, color = Color(0xFF80DEEA))
             Spacer(modifier = Modifier.height(6.dp))
             Text("Traductor Global AI", fontSize = 15.sp, color = Color(0xFFB2EBF2))
@@ -619,7 +626,7 @@ fun VoiceToSignScreen(context: Context) {
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // 3. DESPLEGABLE DE IDIOMA (AHORA DEBAJO DEL VIDEO)
+            // 3. DESPLEGABLE DE IDIOMA (DEBAJO DEL VIDEO)
             Box {
                 Button(
                     onClick = { showMenu = true },
